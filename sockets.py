@@ -13,8 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+
+
+# Reference: https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.py
+
 import flask
-from flask import Flask, request
+from flask import Flask, request, redirect, url_for, render_template,send_from_directory
 from flask_sockets import Sockets
 import gevent
 from gevent import queue
@@ -59,6 +64,26 @@ class World:
     def world(self):
         return self.space
 
+clients = list()
+
+def send_all(msg):
+    for client in clients:
+        client.put( msg )
+
+def send_all_json(obj):
+    send_all( json.dumps(obj) )
+
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
+
+
 myWorld = World()        
 
 def set_listener( entity, data ):
@@ -66,22 +91,45 @@ def set_listener( entity, data ):
 
 myWorld.add_set_listener( set_listener )
         
-@app.route('/')
+@app.route("/")
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    return send_from_directory(root, 'index.html')
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
-    return None
+    try:
+        while True:
+            msg = ws.receive()
+            print(msg)
+            if (msg is not None):
+                packet = json.loads(msg)
+                send_all_json(packet)
+                update(packet)
+            else:
+                break
+    except Exception as e:  # WebSocketError as e:
+        print('Websocket error: ', e)
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
     # XXX: TODO IMPLEMENT ME
-    return None
+    client = Client()
+    clients.append(client)
+    g = gevent.spawn(read_ws, ws, client)
+    try:
+        while True:
+            msg = client.get()
+            ws.send(msg)
+    except Exception as e:  # WebSocketError as e:
+        print('Websocket error: ',e)
+    finally:
+        clients.remove(client)
+        gevent.kill(g)
 
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
@@ -99,23 +147,34 @@ def flask_post_json():
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+    try:
+        data = flask_post_json()
+        if request.method == 'POST':
+            for key in data.keys():
+                myWorld.update(entity=entity, key=key, value=data[key])
+            return json.dumps(myWorld.get(entity)), 200
+        if request.method == 'PUT':
+            myWorld.set(entity,data)
+            return json.dumps(myWorld.get(entity))
+    except:
+        return 'update failed', 400
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    return json.dumps(myWorld.world()),200
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    return json.dumps(myWorld.get(entity)),200
 
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    myWorld.clear()
+    return json.dumps(myWorld.world()), 200
 
 
 
@@ -125,4 +184,4 @@ if __name__ == "__main__":
         and run
         gunicorn -k flask_sockets.worker sockets:app
     '''
-    app.run()
+    app.run(port=8000)
