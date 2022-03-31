@@ -282,11 +282,10 @@ function wsSetup() {
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
-        data = {}
-        sendJSONXMLHTTPRequest("http://127.0.0.1:5000/world", null, function(data){
-        world = data;
+        sendJSONXMLHTTPRequest("/world", null, function(data){
+            world = data;
+            drawNextFrame();
         });
-        drawNextFrame();
         drawFrame();
     };
     socket.onerror = function(msg) {
@@ -302,7 +301,6 @@ function wsSetup() {
                 world[i] = entity[i];
             }
             drawNextFrame();
-            drawFrame();
         } catch (e) {
             alert("socket on message: " + e);
         }
