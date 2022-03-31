@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+# Reference : https://github.com/uofa-cmput404/cmput404-slides/tree/master/examples/WebSocketsExamples
+
 import flask
 from flask import Flask, request,redirect
 from flask_sockets import Sockets
@@ -58,6 +61,7 @@ class World:
     def update(self, entity, key, value):
         entry = self.space.get(entity,dict())
         entry[key] = value
+        #print(entry)
         self.space[entity] = entry
         self.update_listeners( entity )
 
@@ -97,8 +101,10 @@ def read_ws(ws,client):
     try:
         while True:
             msg = ws.receive()
+            #print(111)
             if (msg is not None):
                 packet = json.loads(msg)
+                #print(msg)
                 send_all_json(packet)
                 update(packet)
             else:
@@ -141,9 +147,12 @@ def flask_post_json():
 def update(entity):
     '''update the entities via this interface'''
     try:
-        data = flask_post_json()
-        for key in data.keys():
-            myWorld.update(entity=entity, key=key, value=data[key])
+        #print(entity)
+        for key in entity.keys():
+            for item in entity[key]:
+                #print(item)
+                #print(entity[key][item])
+                myWorld.update(entity=key, key=item, value=entity[key][item])
         return json.dumps(myWorld.get(entity)), 200
     except:
         return 'update failed', 400
