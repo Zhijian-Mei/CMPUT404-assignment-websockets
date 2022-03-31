@@ -248,12 +248,46 @@ function update() {
     drawFrame();
 }
 
+function sendJSONXMLHTTPRequest(url, objects, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState==4) {
+            try {
+                if (xhr.status==200) {
+                    //XXX: parse some JSON from the request!
+                    var data = JSON.parse(xhr.responseText);
+                    //XXX: Pass the data to the callback!
+                    callback(data);
+                }
+            }
+            catch(e) {
+                alert('Error: ' + e.name);
+            }
+        }
+    };
+    if (objects !== null){
+    //XXX: POST to a URL
+    xhr.open("POST", url, true);
+    //XXX: set the mimetype and the accept headers!
+        } else {
+        xhr.open("GET", url, true);
+    }
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.send(JSON.stringify(objects));
+    // Remember to use application/json !
+}
 
 function wsSetup() {
     var url = "ws://"+host+"/subscribe";   
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
+        data = {}
+        sendJSONXMLHTTPRequest("http://127.0.0.1:5000/world", null, function(data){
+        world = data;
+        });
+        drawNextFrame();
+        drawFrame();
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -261,7 +295,14 @@ function wsSetup() {
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            //XXX: TODO What are you going to do here?
+            var entity = JSON.parse(msg.data)
+            for (i in entity){
+                console.log(entity[i]);
+                world[i] = entity[i];
+            }
+            drawNextFrame();
+            drawFrame();
         } catch (e) {
             alert("socket on message: " + e);
         }
