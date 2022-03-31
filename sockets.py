@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 
+
 # Reference : https://github.com/uofa-cmput404/cmput404-slides/tree/master/examples/WebSocketsExamples
 
 import flask
@@ -83,6 +84,26 @@ class World:
     def world(self):
         return self.space
 
+clients = list()
+
+def send_all(msg):
+    for client in clients:
+        client.put( msg )
+
+def send_all_json(obj):
+    send_all( json.dumps(obj) )
+
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
+
+
 myWorld = World()        
 
 def set_listener( entity, data ):
@@ -90,7 +111,7 @@ def set_listener( entity, data ):
 
 myWorld.add_set_listener( set_listener )
         
-@app.route('/')
+@app.route("/")
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
     return redirect('./static/index.html',code=302)
@@ -109,8 +130,8 @@ def read_ws(ws,client):
                 update(packet)
             else:
                 break
-    except:
-        '''Done'''
+    except Exception as e:  # WebSocketError as e:
+        print('Websocket error: ', e)
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
@@ -125,7 +146,7 @@ def subscribe_socket(ws):
             msg = client.get()
             ws.send(msg)
     except Exception as e:  # WebSocketError as e:
-        print("WS Error %s" % e)
+        print('Websocket error: ',e)
     finally:
         clients.remove(client)
         gevent.kill(g)
@@ -182,4 +203,4 @@ if __name__ == "__main__":
         and run
         gunicorn -k flask_sockets.worker sockets:app
     '''
-    app.run()
+    app.run(port=8000)
