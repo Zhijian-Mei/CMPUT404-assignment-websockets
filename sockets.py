@@ -15,11 +15,10 @@
 #
 
 
-
-# Reference: https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.py
+# Reference : https://github.com/uofa-cmput404/cmput404-slides/tree/master/examples/WebSocketsExamples
 
 import flask
-from flask import Flask, request, redirect, url_for, render_template,send_from_directory
+from flask import Flask, request,redirect
 from flask_sockets import Sockets
 import gevent
 from gevent import queue
@@ -30,6 +29,26 @@ import os
 app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
+
+clients = list()
+# reference : https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.py
+# reference : https://github.com/abramhindle/WebSocketsExamples/blob/master/broadcaster.py
+def send_all(msg):
+    for client in clients:
+        client.put( msg )
+
+def send_all_json(obj):
+    send_all( json.dumps(obj) )
+
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
 
 class World:
     def __init__(self):
@@ -43,6 +62,7 @@ class World:
     def update(self, entity, key, value):
         entry = self.space.get(entity,dict())
         entry[key] = value
+        #print(entry)
         self.space[entity] = entry
         self.update_listeners( entity )
 
@@ -94,8 +114,7 @@ myWorld.add_set_listener( set_listener )
 @app.route("/")
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-    return send_from_directory(root, 'index.html')
+    return redirect('./static/index.html',code=302)
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
@@ -103,9 +122,10 @@ def read_ws(ws,client):
     try:
         while True:
             msg = ws.receive()
-            print(msg)
+            #print(111)
             if (msg is not None):
                 packet = json.loads(msg)
+                #print(msg)
                 send_all_json(packet)
                 update(packet)
             else:
@@ -148,21 +168,20 @@ def flask_post_json():
 def update(entity):
     '''update the entities via this interface'''
     try:
-        data = flask_post_json()
-        if request.method == 'POST':
-            for key in data.keys():
-                myWorld.update(entity=entity, key=key, value=data[key])
-            return json.dumps(myWorld.get(entity)), 200
-        if request.method == 'PUT':
-            myWorld.set(entity,data)
-            return json.dumps(myWorld.get(entity))
+        #print(entity)
+        for key in entity.keys():
+            for item in entity[key]:
+                #print(item)
+                #print(entity[key][item])
+                myWorld.update(entity=key, key=item, value=entity[key][item])
+        return json.dumps(myWorld.get(entity)), 200
     except:
         return 'update failed', 400
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return json.dumps(myWorld.world()),200
+    return json.dumps(myWorld.world()), 200
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
